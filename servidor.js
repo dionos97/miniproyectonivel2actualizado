@@ -9,7 +9,7 @@ const app = express();
 
 // Configuración de la conexión a la base de datos
 const connection = mysql.createConnection({
-  host: 'dionos97',
+  host: 'localhost',
   user: 'dionos97', 
   password: '123d', 
   database: 'miniproyectonivel2'   
