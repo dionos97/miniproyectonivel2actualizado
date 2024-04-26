@@ -2,6 +2,8 @@ const http = require('http');
 const fs = require('fs');
 const mysql = require('mysql2');
 const express = require('express');
+const csvParser = require('csv-parser');
+const { createObjectCsvWriter } = require('csv-writer');
 
 const PORT = process.env.PORT || 3000;
 
@@ -23,6 +25,10 @@ connection.connect((err) => {
   }
   console.log('Conexión a la base de datos exitosa');
 });
+
+// Middleware para parsear el cuerpo de las solicitudes
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
 // Ruta para obtener todos los usuarios desde la base de datos y mostrarlos en la página
 app.get('/usuarios', (req, res) => {
@@ -54,20 +60,70 @@ app.get('/usuarios', (req, res) => {
 
 // Ruta para cambiar usuario
 app.post('/cambiar-usuario', (req, res) => {
-  // Agregar la lógica necesaria para cambiar el usuario, según los requisitos del proyecto
-  res.send('Lógica para cambiar usuario');
+  const { id, nombre, correo } = req.body;
+  connection.query(
+    'UPDATE usuarios SET nombre = ?, correo = ? WHERE id = ?',
+    [nombre, correo, id],
+    (err, results) => {
+      if (err) {
+        console.error('Error al cambiar usuario:', err);
+        res.status(500).send('Error al cambiar usuario');
+        return;
+      }
+      res.send('Usuario cambiado exitosamente');
+    }
+  );
 });
 
-// Ruta para importar usuarios desde un archivo
+// Ruta para importar usuarios desde un archivo CSV
 app.post('/api/usuarios/import', (req, res) => {
-  // Agregar la lógica necesaria para importar usuarios desde un archivo a la base de datos
-  res.send('Lógica para importar usuarios desde un archivo');
+  const csvData = []; // Almacena los datos CSV parseados
+
+  fs.createReadStream(req.file.path)
+    .pipe(csvParser())
+    .on('data', (row) => {
+      csvData.push(row);
+    })
+    .on('end', () => {
+      connection.query('INSERT INTO usuarios (nombre, correo) VALUES ?', [csvData.map(user => [user.nombre, user.correo])], (err, results) => {
+        if (err) {
+          console.error('Error al importar usuarios desde un archivo CSV:', err);
+          res.status(500).send('Error al importar usuarios desde un archivo CSV');
+          return;
+        }
+        res.send('Datos CSV importados correctamente');
+      });
+    });
 });
 
-// Ruta para exportar usuarios a un archivo
+// Ruta para exportar usuarios a un archivo CSV
 app.get('/api/usuarios/export', (req, res) => {
-  // Agregar la lógica necesaria para exportar usuarios desde la base de datos a un archivo
-  res.send('Lógica para exportar usuarios a un archivo');
+  connection.query('SELECT * FROM usuarios', (err, results) => {
+    if (err) {
+      console.error('Error al obtener usuarios desde la base de datos:', err);
+      res.status(500).send('Error al obtener usuarios desde la base de datos');
+      return;
+    }
+
+    const csvWriter = createObjectCsvWriter({
+      path: 'usuarios.csv',
+      header: [
+        { id: 'id', title: 'ID' },
+        { id: 'nombre', title: 'Nombre' },
+        { id: 'correo', title: 'Correo' }
+      ]
+    });
+
+    csvWriter.writeRecords(results)
+      .then(() => {
+        console.log('Usuarios exportados a usuarios.csv');
+        res.download('usuarios.csv'); // Descargar el archivo CSV
+      })
+      .catch((error) => {
+        console.error('Error al escribir en el archivo CSV:', error);
+        res.status(500).send('Error al exportar usuarios a un archivo CSV');
+      });
+  });
 });
 
 // Crear el servidor HTTP
