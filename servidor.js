@@ -24,16 +24,31 @@ connection.connect((err) => {
   console.log('Conexión a la base de datos exitosa');
 });
 
-// Ruta para obtener todos los usuarios desde la base de datos
-app.get('/api/usuarios', (req, res) => {
+// Ruta para obtener todos los usuarios desde la base de datos y mostrarlos en la página
+app.get('/usuarios', (req, res) => {
   connection.query('SELECT * FROM usuarios', (err, results) => {
     if (err) {
       console.error('Error al obtener usuarios desde la base de datos:', err);
-      res.status(500).json({ error: 'Error al obtener usuarios desde la base de datos' });
+      res.status(500).send('Error al obtener usuarios desde la base de datos');
       return;
     }
-    // Devolver los usuarios en formato JSON
-    res.json(results);
+    // Renderizar una plantilla de página HTML con los datos de los usuarios
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Lista de Usuarios</title>
+      </head>
+      <body>
+        <h1>Lista de Usuarios</h1>
+        <ul>
+          ${results.map(user => `<li>${user.nombre}: ${user.correo}</li>`).join('')}
+        </ul>
+      </body>
+      </html>
+    `);
   });
 });
 
